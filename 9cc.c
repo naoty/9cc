@@ -104,16 +104,17 @@ Token *tokenize(char *p) {
       continue;
     }
 
-    if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' ||
-        *p == ')') {
-      // p++はpを返してからインクリメントしている
-      cur = new_token(TK_RESERVED, cur, p++);
+    if (strncmp(p, "==", 2) == 0 || strncmp(p, "!=", 2) == 0 ||
+        strncmp(p, ">=", 2) == 0 || strncmp(p, "<=", 2) == 0) {
+      cur = new_token(TK_RESERVED, cur, p);
+      p += 2;
       continue;
     }
 
-    if (strncmp(p, "==", 2) == 0 || strncmp(p, "!=", 2) == 0) {
-      cur = new_token(TK_RESERVED, cur, p);
-      p += 2;
+    if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' ||
+        *p == ')' || *p == '>' || *p == '<') {
+      // p++はpを返してからインクリメントしている
+      cur = new_token(TK_RESERVED, cur, p++);
       continue;
     }
 
@@ -173,6 +174,7 @@ Node *new_node_num(int val) {
 }
 
 Node *equality();
+Node *relational();
 Node *add();
 Node *mul();
 Node *term();
@@ -184,14 +186,38 @@ Node *expr() {
 }
 
 Node *equality() {
-  Node *node = add();
+  Node *node = relational();
 
   for (;;) {
     if (consume("==")) {
-      node = new_node(ND_E, node, add());
+      node = new_node(ND_E, node, relational());
       continue;
     } else if (consume("!=")) {
-      node = new_node(ND_NE, node, add());
+      node = new_node(ND_NE, node, relational());
+    } else {
+      break;
+    }
+  }
+
+  return node;
+}
+
+Node *relational() {
+  Node *node = add();
+
+  for (;;) {
+    if (consume("<=")) {
+      node = new_node(ND_LE, node, add());
+      continue;
+    } else if (consume("<")) {
+      node = new_node(ND_L, node, add());
+      continue;
+    } else if (consume(">=")) {
+      node = new_node(ND_GE, add(), node);
+      continue;
+    } else if (consume(">")) {
+      node = new_node(ND_G, add(), node);
+      continue;
     } else {
       break;
     }
@@ -274,6 +300,18 @@ void gen(Node *node) {
     case ND_NE:
       printf("  cmp rax, rdi\n");
       printf("  setne al\n");
+      printf("  movzb rax, al\n");
+      break;
+    case ND_L:
+    case ND_G:
+      printf("  cmp rax, rdi\n");
+      printf("  setl al\n");
+      printf("  movzb rax, al\n");
+      break;
+    case ND_LE:
+    case ND_GE:
+      printf("  cmp rax, rdi\n");
+      printf("  setle al\n");
       printf("  movzb rax, al\n");
       break;
     case ND_ADD:
